@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# Sky Nowcast: self-contained source + private GitHub APK builder.
+# Usage: bash setup-sky-nowcast-github.sh [new-repository-name]
+set -euo pipefail
+umask 077
+for tool in git gh python3 keytool; do
+  command -v "$tool" >/dev/null || { echo "Missing $tool. Termux: pkg install git gh python openjdk-17"; exit 1; }
+done
+repo_name=${1:-sky-nowcast}
+[[ "$repo_name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo 'Use a simple repository name, without a username or slash.'; exit 1; }
+gh auth status --hostname github.com >/dev/null 2>&1 || gh auth login --hostname github.com --git-protocol https --web
+owner=$(gh api --hostname github.com user --jq .login)
+repo="$owner/$repo_name"
+project="$PWD/$repo_name"
+[[ ! -e "$project" ]] || { echo "Folder already exists: $project. Choose a new name."; exit 1; }
+if gh repo view "$repo" >/dev/null 2>&1; then
+  echo "Repository $repo exists. Choose a new name; nothing has been overwritten."
+  exit 1
+fi
+mkdir "$project"
+cd "$project"
+python3 - <<'SOURCE'
+import base64,io,zipfile
+zipfile.ZipFile(io.BytesIO(base64.b64decode('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'))).extractall('.')
+SOURCE
+mkdir -p .github/workflows
+cat > .gitignore <<'IGNORE'
+*.keystore
+*.jks
+*.apk
+*.jar
+*.class
+**/classes/
+**/test-classes/
+**/dex/
+IGNORE
+cat > .github/workflows/build-apk.yml <<'WORKFLOW'
+name: Build Sky Nowcast APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - name: Check cloud rules
+        working-directory: Sky-Nowcast
+        run: |
+          mkdir -p test-classes
+          javac -d test-classes src/org/ian/nowcast/CloudRules.java tests/RuleCheck.java
+          java -cp test-classes RuleCheck
+      - name: Restore personal development signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.NOWCAST_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || { echo 'Missing NOWCAST_KEYSTORE_BASE64 secret'; exit 1; }
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > Sky-Nowcast/dev.keystore
+          chmod 600 Sky-Nowcast/dev.keystore
+      - name: Build and verify APK
+        run: ANDROID_SDK_ROOT="$ANDROID_HOME" bash Sky-Nowcast/build.sh
+      - name: Remove signing key
+        if: always()
+        run: rm -f Sky-Nowcast/dev.keystore
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Sky-Nowcast-APK
+          path: Sky-Nowcast.apk
+          if-no-files-found: error
+          retention-days: 30
+WORKFLOW
+cat > README.md <<'README'
+# Sky Nowcast — personal APK builds
+Open **Actions → Build Sky Nowcast APK → latest successful run → Artifacts → Sky-Nowcast-APK**.
+Download and unzip the artifact, then open Sky-Nowcast.apk on your Android phone.
+Each push to main builds again. You can also select Run workflow in Actions.
+
+Source, offline weather rules and limitations: [Sky-Nowcast/README.md](Sky-Nowcast/README.md).
+The build needs internet; the installed app operates offline.
+This is a personal prototype, not an official weather-warning app.
+
+The setup script stores a generated development key in NOWCAST_KEYSTORE_BASE64,
+a GitHub Actions repository secret. Back up your local Sky-Nowcast/dev.keystore
+privately; it is excluded from Git. The demonstration key password is android.
+Keep this same key for updates. A newly generated key cannot update the APK
+previously supplied in ChatGPT. Uninstalling the old app deletes its local history.
+GitHub-hosted builds and physical-device operation still require validation.
+
+After modifying source:
+```
+git add Sky-Nowcast/src Sky-Nowcast/AndroidManifest.xml
+git commit -m "Update Sky Nowcast"
+git push
+```
+README
+keytool -genkeypair -keystore Sky-Nowcast/dev.keystore -storepass android -keypass android -alias nowcast -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Sky Nowcast Personal Prototype'
+git init -b main
+git config user.name "$owner"
+git config user.email "$owner@users.noreply.github.com"
+git add .gitignore README.md .github Sky-Nowcast
+git commit -m 'Add offline Sky Nowcast and automatic APK build'
+gh repo create "$repo" --private --source=. --remote=origin
+python3 - <<'KEY' | gh secret set NOWCAST_KEYSTORE_BASE64 --repo "$repo"
+import base64,pathlib
+print(base64.b64encode(pathlib.Path('Sky-Nowcast/dev.keystore').read_bytes()).decode())
+KEY
+git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push -u origin main
+printf '\nSource uploaded. Watch the build: https://github.com/%s/actions\n' "$repo"
+printf 'Download Sky-Nowcast-APK from the successful run, unzip, and install.\n'
+printf 'Keep a private backup of: %s/Sky-Nowcast/dev.keystore\n' "$project"
